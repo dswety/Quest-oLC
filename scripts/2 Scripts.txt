@@ -1,0 +1,127 @@
+O script será para PostgreSQL, que suporta ENUM e jsonb nativamente.
+1. Criação de ENUM para status
+-- Criação do tipo ENUM para status do funcionário
+CREATE TYPE status_funcionario AS ENUM ('Ativo', 'Férias', 'Demitido');
+
+2. Criação das Tabelas
+funcionário
+CREATE TABLE funcionario (
+    id_funcionario SERIAL PRIMARY KEY,
+    nome VARCHAR(100) NOT NULL,
+    cpf CHAR(11) NOT NULL UNIQUE,
+    data_admissao DATE NOT NULL,
+    status status_funcionario NOT NULL
+);
+
+func_horista
+CREATE TABLE func_horista (
+    id_func INTEGER PRIMARY KEY,
+    valor_hora NUMERIC(10,2) NOT NULL,
+    horas_semanais INTEGER NOT NULL,
+    FOREIGN KEY (id_func) REFERENCES funcionario(id_funcionario) ON DELETE CASCADE
+);
+
+func_assalariado
+CREATE TABLE func_assalariado (
+    id_func INTEGER PRIMARY KEY,
+    salario_mensal NUMERIC(10,2) NOT NULL,
+    bonus_anual NUMERIC(10,2),
+    FOREIGN KEY (id_func) REFERENCES funcionario(id_funcionario) ON DELETE CASCADE
+);
+
+Índices Adicionais
+-- Índice para busca rápida por nome
+CREATE INDEX idx_funcionario_nome ON funcionario(nome);
+
+-- Índice para status (ajuda em filtros)
+CREATE INDEX idx_funcionario_status ON funcionario(status);
+
+-- Índice para CPF (já é UNIQUE, mas documentamos aqui)
+-- O PostgreSQL já cria índice automaticamente para UNIQUE
+
+Uso de jsonb: quando e onde?
+
+Vamos considerar a possibilidade de um campo jsonb no funcionário para informações adicionais não estruturadas, como:
+
+Certificações
+
+Habilidades
+
+Preferências pessoais
+
+Histórico de cargos internos
+
+Exemplo com jsonb
+ALTER TABLE funcionario
+ADD COLUMN dados_adicionais JSONB;
+
+Quando jsonb é vantajoso?
+
+Flexibilidade de schema: pode armazenar diferentes atributos para diferentes funcionários.
+
+Baixa frequência de leitura/escrita: ideal para dados acessados esporadicamente.
+
+Menor rigidez: bom para POCs, protótipos ou quando o modelo ainda está em evolução.
+
+Exemplo de uso:
+INSERT INTO funcionario (nome, cpf, data_admissao, status, dados_adicionais)
+VALUES (
+  'João Silva', '12345678900', '2020-01-01', 'Ativo',
+  '{"certificacoes": ["AWS", "PMP"], "idiomas": {"ingles": "avançado"}}'
+);
+
+Quando jsonb é um peso?
+
+Falta de integridade relacional: não é possível aplicar constraints, FKs, nem tipos.
+
+Consultas complexas e lentas: exige uso de funções específicas (->, ->>, @>, etc).
+
+Indexação limitada: exige índices GIN para performance decente, que são mais pesados.
+
+Exemplo de índice GIN:
+CREATE INDEX idx_funcionario_dados_gin ON funcionario USING GIN (dados_adicionais);
+
+Conclusão sobre jsonb
+
+| Situação                             | jsonb é adequado? |
+| ------------------------------------ | ----------------- |
+| Dados estruturados e críticos        | ❌ Não             |
+| Dados semi-estruturados ou opcionais | ✅ Sim             |
+| Dados que precisam de integridade    | ❌ Não             |
+| Dados flexíveis de baixa frequência  | ✅ Sim             |
+
+Script Completo Resumido
+-- 1. Tipo ENUM
+CREATE TYPE status_funcionario AS ENUM ('Ativo', 'Férias', 'Demitido');
+
+-- 2. Tabela principal
+CREATE TABLE funcionario (
+    id_funcionario SERIAL PRIMARY KEY,
+    nome VARCHAR(100) NOT NULL,
+    cpf CHAR(11) NOT NULL UNIQUE,
+    data_admissao DATE NOT NULL,
+    status status_funcionario NOT NULL,
+    dados_adicionais JSONB
+);
+
+-- 3. Subtabela horista
+CREATE TABLE func_horista (
+    id_func INTEGER PRIMARY KEY,
+    valor_hora NUMERIC(10,2) NOT NULL,
+    horas_semanais INTEGER NOT NULL,
+    FOREIGN KEY (id_func) REFERENCES funcionario(id_funcionario) ON DELETE CASCADE
+);
+
+-- 4. Subtabela assalariado
+CREATE TABLE func_assalariado (
+    id_func INTEGER PRIMARY KEY,
+    salario_mensal NUMERIC(10,2) NOT NULL,
+    bonus_anual NUMERIC(10,2),
+    FOREIGN KEY (id_func) REFERENCES funcionario(id_funcionario) ON DELETE CASCADE
+);
+
+-- 5. Índices
+CREATE INDEX idx_funcionario_nome ON funcionario(nome);
+CREATE INDEX idx_funcionario_status ON funcionario(status);
+CREATE INDEX idx_funcionario_dados_gin ON funcionario USING GIN (dados_adicionais);
+

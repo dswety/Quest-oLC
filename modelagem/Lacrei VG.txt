@@ -1,0 +1,171 @@
+Cenário: Sistema de Gestão de Funcionários
+
+Um sistema precisa armazenar informações de funcionários de uma empresa. Existem dois tipos de funcionários: Funcionários Horistas e Funcionários Assalariados. Ambos compartilham informações em comum (nome, CPF, data de admissão), mas também possuem informações específicas:
+
+Horistas: valor da hora, horas trabalhadas por semana
+
+Assalariados: salário mensal fixo, bônus anual
+
+Além disso, cada funcionário possui um status: Ativo, Férias, Demitido.
+
+Proposta 1 – Herança (Generalização/Especialização)
+DER
+               +----------------------+
+               |      FUNCIONARIO     |
+               +----------------------+
+               | PK id_funcionario    |
+               | nome                 |
+               | cpf                  |
+               | data_admissao        |
+               | status               | ← ENUM
+               +----------------------+
+                     /        \
+                    /          \
+     +----------------+   +-------------------+
+     | FUNC_HORISTA   |   | FUNC_ASSALARIADO  |
+     +----------------+   +-------------------+
+     | PK,FK id_func  |   | PK,FK id_func     |
+     | valor_hora     |   | salario_mensal    |
+     | horas_semanais |   | bonus_anual       |
+     +----------------+   +-------------------+
+Dicionário de Dados
+| Tabela            | Coluna          | Tipo          | Restrições                            |
+| ----------------- | --------------- | ------------- | ------------------------------------- |
+| FUNCIONARIO       | id\_funcionario | INT           | PK, AUTO\_INCREMENT                   |
+|                   | nome            | VARCHAR(100)  | NOT NULL                              |
+|                   | cpf             | CHAR(11)      | NOT NULL, UNIQUE                      |
+|                   | data\_admissao  | DATE          | NOT NULL                              |
+|                   | status          | ENUM          | ('Ativo', 'Férias', 'Demitido')       |
+| FUNC\_HORISTA     | id\_func        | INT           | PK, FK → FUNCIONARIO(id\_funcionario) |
+|                   | valor\_hora     | DECIMAL(10,2) | NOT NULL                              |
+|                   | horas\_semanais | INT           | NOT NULL                              |
+| FUNC\_ASSALARIADO | id\_func        | INT           | PK, FK → FUNCIONARIO(id\_funcionario) |
+|                   | salario\_mensal | DECIMAL(10,2) | NOT NULL                              |
+|                   | bonus\_anual    | DECIMAL(10,2) | NULLABLE                              |
+
+Vantagens
+
+Clareza na modelagem orientada a objetos.
+
+Evita colunas nulas em campos específicos de subclasses.
+
+Facilita a integridade referencial e restrições.
+
+Desvantagens
+
+Necessidade de joins para recuperar dados completos.
+
+Levemente mais complexo para consultas agregadas.
+
+Mais difícil de escalar para muitos tipos de funcionários.
+
+Contexto Ideal
+
+Sistema com poucos tipos bem definidos e distintos de subclasses.
+
+Alto reaproveitamento de dados comuns.
+
+Cenários com forte orientação a objetos (ex: Java, C#).
+
+Proposta 2 – Tabelas Segregadas (Sem Herança)
+DER
+       +--------------------+        +-------------------------+
+       | FUNCIONARIO_HORISTA|        | FUNCIONARIO_ASSALARIADO |
+       +--------------------+        +-------------------------+
+       | PK id_funcionario  |        | PK id_funcionario       |
+       | nome               |        | nome                    |
+       | cpf                |        | cpf                     |
+       | data_admissao      |        | data_admissao           |
+       | status             |        | status                  |
+       | valor_hora         |        | salario_mensal          |
+       | horas_semanais     |        | bonus_anual             |
+       +--------------------+        +-------------------------+
+Dicionário de Dados
+| Tabela                   | Coluna          | Tipo          | Restrições                      |
+| ------------------------ | --------------- | ------------- | ------------------------------- |
+| FUNCIONARIO\_HORISTA     | id\_funcionario | INT           | PK, AUTO\_INCREMENT             |
+|                          | nome            | VARCHAR(100)  | NOT NULL                        |
+|                          | cpf             | CHAR(11)      | NOT NULL, UNIQUE                |
+|                          | data\_admissao  | DATE          | NOT NULL                        |
+|                          | status          | ENUM          | ('Ativo', 'Férias', 'Demitido') |
+|                          | valor\_hora     | DECIMAL(10,2) | NOT NULL                        |
+|                          | horas\_semanais | INT           | NOT NULL                        |
+| FUNCIONARIO\_ASSALARIADO | id\_funcionario | INT           | PK, AUTO\_INCREMENT             |
+|                          | nome            | VARCHAR(100)  | NOT NULL                        |
+|                          | cpf             | CHAR(11)      | NOT NULL, UNIQUE                |
+|                          | data\_admissao  | DATE          | NOT NULL                        |
+|                          | status          | ENUM          | ('Ativo', 'Férias', 'Demitido') |
+|                          | salario\_mensal | DECIMAL(10,2) | NOT NULL                        |
+|                          | bonus\_anual    | DECIMAL(10,2) | NULLABLE                        |
+
+Vantagens
+
+Consultas mais rápidas (não há joins).
+
+Simples de implementar em bancos que não lidam bem com herança.
+
+Cada tabela trata de um tipo específico e completo.
+
+Desvantagens
+
+Redundância de estrutura.
+
+Difícil aplicar regras genéricas (ex: listar todos os funcionários).
+
+Requer código adicional para consolidar dados.
+
+Contexto Ideal
+
+Sistemas simples ou com poucos registros.
+
+Necessidade de performance de leitura sem joins.
+
+Ambientes com banco de dados simples (ex: MySQL sem ORM).
+
+Comparativo: Enum vs Tabela de Domínio
+Uso de ENUM (como nas duas propostas)
+status ENUM('Ativo', 'Férias', 'Demitido')
+       +-----------------+           +-------------------+
+       |    FUNCIONARIO  |           |     STATUS        |
+       +-----------------+           +-------------------+
+       | status_id (FK)  |  ----->   | id_status (PK)    |
+       |                 |           | descricao         |
+       +-----------------+           +-------------------+
+ENUM – Vantagens
+
+Simples e direto.
+
+Menos joins.
+
+Leitura rápida.
+
+ENUM – Desvantagens
+
+Dificuldade em alterar valores no futuro.
+
+Pouca flexibilidade se quiser adicionar metadados (cores, ícones, etc).
+
+Dependência da estrutura do banco.
+
+Tabela de Domínio – Vantagens
+
+Flexível e expansível (pode adicionar novas colunas).
+
+Facilita tradução, auditoria e personalização.
+
+Ideal para sistemas com regras de negócio complexas.
+
+Tabela de Domínio – Desvantagens
+
+Exige mais joins.
+
+Ligeiramente mais complexo para relatórios simples.
+Conclusão
+| Critério                      | Herança (Proposta 1)     | Tabelas Segregadas (Proposta 2)    |
+| ----------------------------- | ------------------------ | ---------------------------------- |
+| Facilidade de manutenção      | Alta com poucos tipos    | Alta com dados simples e estáticos |
+| Flexibilidade                 | Alta                     | Baixa                              |
+| Desempenho                    | Médio (depende de joins) | Alto (consulta direta)             |
+| Normalização                  | Alta                     | Média                              |
+| Facilidade para BI/Relatórios | Médio                    | Baixo (necessita unificar dados)   |
+
