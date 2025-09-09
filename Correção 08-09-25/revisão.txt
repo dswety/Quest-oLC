@@ -1,0 +1,110 @@
+Revisar a modelagem incluindo tabelas de domínio e vigência, substituindo ENUM onde aplicável
+
+O uso de ENUM para o campo status limita a flexibilidade e dificulta manutenções futuras. Em vez disso, recomenda-se a criação de uma tabela de domínio versionada, permitindo a inclusão de novos status, desativação de status antigos, e rastreabilidade histórica.
+
+Nova tabela: STATUS_FUNCIONARIO
+
+CREATE TABLE STATUS_FUNCIONARIO (
+    id_status INT PRIMARY KEY AUTO_INCREMENT,
+    descricao VARCHAR(50) NOT NULL,
+    ativo BOOLEAN NOT NULL DEFAULT TRUE,
+    dt_inicio_validade DATE NOT NULL,
+    dt_fim_validade DATE DEFAULT NULL
+);
+
+
+Nas tabelas FUNCIONARIO, FUNCIONARIO_HORISTA e FUNCIONARIO_ASSALARIADO, o campo status passa a ser status_id, com chave estrangeira para STATUS_FUNCIONARIO(id_status), promovendo integridade referencial e flexibilidade na definição de regras de negócio.
+
+Vantagens da mudança:
+
+Permite alterações nos status sem necessidade de alterar a estrutura do banco.
+
+Suporta múltiplos idiomas, ícones, cores, e outros metadados.
+
+Possibilita a implementação de regras de vigência (ex.: status válidos por período).
+
+Facilita auditoria e conformidade com processos regulatórios.
+
+Incluir políticas de LGPD e auditoria, detalhando como serão aplicadas
+
+O sistema deve estar em conformidade com a Lei Geral de Proteção de Dados (LGPD), uma vez que lida com dados pessoais identificáveis, como nome e CPF.
+
+Medidas propostas:
+
+Criptografia ou pseudonimização de dados sensíveis, especialmente o CPF, nos bancos de dados de produção. Dados criptografados devem ser acessados somente por processos autorizados.
+
+Controle de acesso por papel (RBAC): usuários com permissões específicas podem acessar, editar ou excluir registros de funcionários. Auditorias de acesso devem ser registradas.
+
+Campos de auditoria em todas as tabelas principais:
+
+created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+updated_at    DATETIME NULL ON UPDATE CURRENT_TIMESTAMP,
+changed_by    VARCHAR(50) NULL
+
+
+Mascaramento de dados em visualizações e relatórios (ex.: CPF exibido como ***.***.123-45 para usuários sem permissão total).
+
+Exemplo de aplicação na tabela FUNCIONARIO:
+
+ALTER TABLE FUNCIONARIO
+  ADD COLUMN created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  ADD COLUMN updated_at DATETIME NULL ON UPDATE CURRENT_TIMESTAMP,
+  ADD COLUMN changed_by VARCHAR(50) NULL;
+
+
+Essas práticas fortalecem a segurança da informação, garantem rastreabilidade e reduzem riscos legais e operacionais.
+
+Apresentar consultas típicas e os índices correspondentes, justificando a decisão técnica
+
+A definição de índices deve ser orientada pelas consultas mais frequentes no sistema, equilibrando desempenho e custo de manutenção.
+
+Consulta 1: Listar todos os funcionários ativos
+SELECT nome, cpf
+FROM FUNCIONARIO
+WHERE status_id = (SELECT id_status FROM STATUS_FUNCIONARIO WHERE descricao = 'Ativo' AND ativo = TRUE);
+
+
+Índice recomendado:
+
+CREATE INDEX idx_funcionario_status ON FUNCIONARIO(status_id);
+
+
+Justificativa: melhora significativamente a filtragem por status em grandes volumes de dados.
+
+Consulta 2: Buscar funcionário por CPF (validação, autenticação, integração)
+SELECT * FROM FUNCIONARIO WHERE cpf = '12345678901';
+
+
+Índice recomendado:
+
+CREATE UNIQUE INDEX idx_funcionario_cpf ON FUNCIONARIO(cpf);
+
+
+Justificativa: garante unicidade e performance na busca por um identificador único.
+
+Consulta 3: Obter funcionários com admissão em um determinado período
+SELECT nome, data_admissao FROM FUNCIONARIO
+WHERE data_admissao BETWEEN '2023-01-01' AND '2023-12-31';
+
+
+Índice recomendado:
+
+CREATE INDEX idx_funcionario_data_admissao ON FUNCIONARIO(data_admissao);
+
+
+Justificativa: útil para relatórios gerenciais e filtros por faixa de tempo.
+
+Consulta 4: Agregação de salários ou horas por tipo de funcionário
+SELECT AVG(salario_mensal) FROM FUNCIONARIO_ASSALARIADO;
+SELECT SUM(horas_semanais) FROM FUNCIONARIO_HORISTA;
+
+
+Índice recomendado: como são varreduras completas (table scan), índices não são necessários a menos que haja filtros adicionais (ex: por data de admissão ou status).
+
+Resumo: a criação de índices deve sempre considerar:
+
+Se a coluna é usada em WHERE, JOIN, ORDER BY ou GROUP BY.
+
+Se os dados são altamente seletivos.
+
+Se há consultas recorrentes sobre o mesmo conjunto de filtros.
